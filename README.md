@@ -4,6 +4,23 @@ SCD Type 2 pipeline for a product catalog. PySpark handles the diff logic
 (hashing tracked attributes, detecting new/changed rows) and Snowflake stores
 the versioned dimension table, applying the final upsert via `MERGE`.
 
+## Why this matters
+
+Systems that only store the current value of a row can't answer "how was
+this at a specific point in the past". Say a product cost $100 in January and
+a customer bought it then, but the price changed to $150 in March. A revenue
+report for January that joins the sale to the product table would show $150
+if the price was simply overwritten, which is wrong: the sale happened at
+$100. SCD Type 2 keeps both versions with their effective dates, so reports
+join against whatever value was actually true at the time.
+
+This pattern shows up anywhere history has to survive changes to the source
+data: pricing and catalog changes in e-commerce, salary and department
+history in HR systems, and customer address or status history in banking and
+insurance, where audits often require proving what the data looked like on a
+given date. It's a standard building block of dimensional data warehousing
+(the Kimball methodology), which is what this project implements end to end.
+
 ## Architecture
 
 ```
