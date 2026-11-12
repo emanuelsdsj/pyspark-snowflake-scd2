@@ -5,6 +5,12 @@ from pyspark.sql import SparkSession
 
 from scd2_pipeline.transform import build_scd2_changes
 
+EXISTING_SCHEMA = (
+    "product_id string, product_name string, category string, price double, "
+    "supplier string, effective_date date, end_date date, is_current boolean"
+)
+INCOMING_COLUMNS = ["product_id", "product_name", "category", "price", "supplier"]
+
 
 @pytest.fixture(scope="module")
 def spark():
@@ -14,14 +20,10 @@ def spark():
 
 
 def test_new_product_is_inserted(spark):
-    existing = spark.createDataFrame(
-        [],
-        "product_id string, product_name string, category string, price double, "
-        "supplier string, effective_date date, end_date date, is_current boolean",
-    )
+    existing = spark.createDataFrame([], EXISTING_SCHEMA)
     incoming = spark.createDataFrame(
         [("P0001", "Product 1", "Electronics", 100.0, "Acme Corp")],
-        ["product_id", "product_name", "category", "price", "supplier"],
+        INCOMING_COLUMNS,
     )
 
     to_expire, to_insert = build_scd2_changes(existing, incoming, run_date=date(2026, 1, 1))
@@ -34,12 +36,6 @@ def test_new_product_is_inserted(spark):
     assert inserted[0]["end_date"] is None
 
 
-EXISTING_SCHEMA = (
-    "product_id string, product_name string, category string, price double, "
-    "supplier string, effective_date date, end_date date, is_current boolean"
-)
-
-
 def test_changed_product_expires_old_and_inserts_new(spark):
     existing = spark.createDataFrame(
         [("P0001", "Product 1", "Electronics", 100.0, "Acme Corp", date(2025, 1, 1), None, True)],
@@ -47,7 +43,7 @@ def test_changed_product_expires_old_and_inserts_new(spark):
     )
     incoming = spark.createDataFrame(
         [("P0001", "Product 1", "Electronics", 150.0, "Acme Corp")],
-        ["product_id", "product_name", "category", "price", "supplier"],
+        INCOMING_COLUMNS,
     )
 
     to_expire, to_insert = build_scd2_changes(existing, incoming, run_date=date(2026, 1, 1))
@@ -70,7 +66,7 @@ def test_unchanged_product_is_ignored(spark):
     )
     incoming = spark.createDataFrame(
         [("P0001", "Product 1", "Electronics", 100.0, "Acme Corp")],
-        ["product_id", "product_name", "category", "price", "supplier"],
+        INCOMING_COLUMNS,
     )
 
     to_expire, to_insert = build_scd2_changes(existing, incoming, run_date=date(2026, 1, 1))
