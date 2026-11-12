@@ -30,9 +30,7 @@ def build_scd2_changes(
     current = with_row_hash(existing_df.filter(F.col("is_current")), tracked_cols)
     incoming = with_row_hash(incoming_df, tracked_cols)
 
-    joined = incoming.alias("inc").join(
-        current.alias("cur"), on=business_key, how="left"
-    )
+    joined = incoming.alias("inc").join(current.alias("cur"), on=business_key, how="left")
 
     new_rows = joined.filter(F.col("cur.row_hash").isNull())
     changed_rows = joined.filter(
@@ -41,15 +39,12 @@ def build_scd2_changes(
 
     select_cols = [business_key, "product_name", "category", "price", "supplier", "row_hash"]
 
+    incoming_cols = [F.col(f"inc.{c}") for c in select_cols]
     to_insert = (
-        new_rows.select(*[F.col(f"inc.{c}") for c in select_cols])
+        new_rows.select(*incoming_cols)
+        .unionByName(changed_rows.select(*incoming_cols))
         .withColumn("effective_date", F.lit(run_date))
         .withColumn("end_date", F.lit(None).cast("date"))
-        .unionByName(
-            changed_rows.select(*[F.col(f"inc.{c}") for c in select_cols])
-            .withColumn("effective_date", F.lit(run_date))
-            .withColumn("end_date", F.lit(None).cast("date"))
-        )
     )
 
     expire_date = run_date - timedelta(days=1)
